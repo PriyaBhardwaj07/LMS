@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics
+from custom_authentication.custom_mixins import ClientAdminMixin
 from exam.models.allmodels import (
     Course,
     CourseRegisterRecord,
@@ -50,11 +51,11 @@ from exam.models.coremodels import *
 # for enrollment feature
 # will be displayed to employer/client-admin only
 
-class RegisteredCourseListView(APIView):
+class RegisteredCourseListView(APIView,ClientAdminMixin):
     """
         view to display courses that are registered for that customer, whose's id is owned by user in request.
         trigger with GET request
-        should be allowed for only [client-admin / Employer].
+        should be allowed for only [client-admin ].
        
         table : CourseRegisterRecord, Courses
        
@@ -74,18 +75,20 @@ class RegisteredCourseListView(APIView):
     '''
     def get(self, request, format=None):
         try:
-            # ===========================================
             # Extract customer ID from request headers
             user_header = request.headers.get("user")
             if user_header:
                 user_data = json.loads(user_header)
-                customer_id = user_data.get("customer")
+                role_id = user_data.get("role")
             else:
-                return Response({"error": "Customer ID not found in headers."}, status=status.HTTP_400_BAD_REQUEST)
-            # ===========================================
+                return Response({"error": "User role not found in headers."}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Check if the user has client admin privileges
+            if not self.has_client_admin_privileges(request):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
             # Filter CourseRegisterRecord with customer ID and active status
+            customer_id = user_data.get("customer")
             course_register_records = CourseRegisterRecord.objects.filter(customer=customer_id, active=True)
 
             # Check if courses exist
@@ -103,13 +106,13 @@ class RegisteredCourseListView(APIView):
             # Serialize the courses data
             serializer = RegisteredCourseSerializer(courses, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        except (ValidationError, ObjectDoesNotExist) as e:
-            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        """
+            if isinstance(e, ValidationError):
+                return Response({"error": "Validation Error: " + str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    """
         RESULT AFTER TESTING API
         IN HEADER: 
         Key: user
@@ -124,7 +127,7 @@ class RegisteredCourseListView(APIView):
         "version_number": 1
     }
 ]
-        """
+    """
           
 class UserListForEnrollmentView(APIView):
     """

@@ -170,12 +170,20 @@ urlpatterns = [
 
 
     #urls after merge for enroll,edit,delete
-    path('course/modify/', CourseInstanceDetailsView.as_view(), name='update_course_instance'),
-    path('course/reading/', ReadingMaterialView.as_view(), name='reading_material'),
-    path('courses/<int:course_id>/quizzes/<int:quiz_id>/', QuizModifyView.as_view(), name='quiz_modify'),
-    path('courses/<int:course_id>/quizzes/<int:quiz_id>/questions/<int:question_id>/', QuestionModifyView.as_view(), name='question_modify'),
+    path('course/', CourseInstanceDetailsView.as_view(), name='update_course_instance'),
+    path('course/reading/<int:course_id>/', ReadingMaterialView.as_view(), name='reading_material'),  # done
+    path('course/<int:course_id>/quiz/', QuizModifyView.as_view(), name='quiz_modify'),
+    path('quiz/<int:quiz_id>/question/', QuestionModifyView.as_view(), name='question_modify'),
+   
 
 
     
    
 ]
+#TODO
+# in quiz Modify view take the course _id from the url and then quiz_id from request body ..
+# reading material - course_id url 
+# query parameter reading material id for get api
+# quiz_id - query parameter for quiz 
+# quiz_id , question_id - query parameter for question 
+# query parameter empty so bad request 
