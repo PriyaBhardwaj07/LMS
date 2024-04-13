@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics
 from exam import serializers
+from backend.custom_authentication.custom_mixins import SuperAdminMixin
 from exam.serializers.maincourseserializers import DeleteQuestionSerializer, DeleteReadingMaterialSerializer, DeleteSelectedCourseSerializer, DeleteSelectedQuizSerializer
 from exam.serializers.editcourseserializers import EditCourseInstanceSerializer, EditQuestionInstanceSerializer, EditQuizInstanceSerializer, EditVideoMaterialSerializer, EditingQuestionInstanceOnConfirmationSerializer, EditingQuizInstanceOnConfirmationSerializer, NotificationSerializer
 from exam.models.allmodels import (
@@ -50,7 +51,7 @@ from exam.serializers.createcourseserializers import (
 )
 import pandas as pd # type: ignore
 
-class CourseInstanceDetailsView(APIView):
+class CourseInstanceDetailsView(APIView, SuperAdminMixin):
     """ 
     PUT :method updates the details of a course instance based on the provided course_id in the request body
     If the course instance is active, it creates a notification in the notification table.
@@ -59,6 +60,9 @@ class CourseInstanceDetailsView(APIView):
     """  in this we can edit the course instance """
     def put(self, request, format=None):
         try:
+            if not self.has_super_admin_privileges(request):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
             course_id = request.data.get('course_id')
             course = Course.objects.get(pk=course_id)
             
@@ -93,17 +97,21 @@ class CourseInstanceDetailsView(APIView):
             if isinstance(e, (ValidationError, Course.DoesNotExist)):
                 error_message = "Invalid data: " + error_message
             return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST) 
+
     """  
     PATCH : This method soft-deletes a course instance based on the course_id provided in the request body.
     """
 
     def patch(self, request, format=None):
-        serializer = DeleteSelectedCourseSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        course_id = serializer.validated_data['course_id']
-
         try:
+            if not self.has_super_admin_privileges(request):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
+            serializer = DeleteSelectedCourseSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            course_id = serializer.validated_data['course_id']
+
             # Fetch the course instance
             course = Course.objects.get(id=course_id)
 
@@ -164,9 +172,12 @@ class CourseInstanceDetailsView(APIView):
     }
             """
 
-class ReadingMaterialView(APIView):
+class ReadingMaterialView(APIView, SuperAdminMixin):
     def put(self, request, course_id, format=None):
         try:
+            if not self.has_super_admin_privileges(request):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
             reading_material_id = request.data.get('reading_material_id')
             
             if reading_material_id is None:
@@ -201,6 +212,9 @@ class ReadingMaterialView(APIView):
     
     def patch(self, request, course_id, format=None):
         try:
+            if not self.has_super_admin_privileges(request):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
             reading_material_id = request.data.get('reading_material_id')
             
             if reading_material_id is None:
@@ -237,7 +251,6 @@ class ReadingMaterialView(APIView):
                 status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
             return Response({"error": error_message}, status=status_code)
-
     """ 
     AFTER TESTING API:
     PATCH :  REQUEST BODY
@@ -251,10 +264,13 @@ class ReadingMaterialView(APIView):
     }
     """
     
-class QuizModifyView(APIView):
+class QuizModifyView(APIView, SuperAdminMixin):
     
     def put(self, request, course_id, format=None):
         try:
+            if not self.has_super_admin_privileges(request):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+            
             # Check if course exists
             course = Course.objects.get(pk=course_id)
             if course.active:
@@ -283,6 +299,9 @@ class QuizModifyView(APIView):
     
     def patch(self, request, course_id, format=None):
         try:
+            if not self.has_super_admin_privileges(request):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+            
             quiz_id = request.data.get('quiz_id', None)
             if not quiz_id:
                 return Response({"error": "Quiz ID is required in the request body."}, status=status.HTTP_400_BAD_REQUEST)
@@ -311,12 +330,15 @@ class QuizModifyView(APIView):
             error_message = "Quiz not found" if isinstance(e, ObjectDoesNotExist) else "Internal Server Error"
             status_code = status.HTTP_404_NOT_FOUND if isinstance(e, ObjectDoesNotExist) else status.HTTP_500_INTERNAL_SERVER_ERROR
             return Response({"error": error_message}, status=status_code)
-
         
-class QuestionModifyView(APIView):
+class QuestionModifyView(APIView, SuperAdminMixin):
+    
     def put(self, request, quiz_id, format=None):  
         error_response = None
         try:
+            if not self.has_super_admin_privileges(request):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+            
             # Extract question_id from request body
             question_id = request.data.get('question_id')
             if not question_id:
@@ -361,6 +383,9 @@ class QuestionModifyView(APIView):
     def patch(self, request, quiz_id, format=None):
         error_response = None
         try:
+            if not self.has_super_admin_privileges(request):
+                return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+            
             # Extract question_id from request body
             question_id = request.data.get('question_id')
             if not question_id:
@@ -387,7 +412,7 @@ class QuestionModifyView(APIView):
 
                 return Response({"message": "Question deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
 
-        except Question.DoesNotExist:
+        except ObjectDoesNotExist:
             error_response = {"error": "Question not found."}
 
         if error_response:
